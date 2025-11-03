@@ -1,8 +1,9 @@
 # IP Information Chrome Extension
 
-![Extension Screenshot](./s.jpg)
-
 A lightweight Chrome extension that displays your IP address and geolocation information including country, region, city, timezone, and more.
+
+
+![Extension Screenshot](./s.jpg)
 
 ## Features
 
