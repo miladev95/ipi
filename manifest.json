@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "IP Information",
+  "version": "1.0.0",
+  "description": "Fetch and display your IP address and location information",
+  "permissions": [
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://ipapi.co/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "IP Information"
+  }
+}

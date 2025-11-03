@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IP Information</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>IP Information</h1>
+      <button id="refreshBtn" class="refresh-btn" title="Refresh">
+        🔄
+      </button>
+    </div>
+
+    <div id="loading" class="loading">
+      <div class="spinner"></div>
+      <p>Fetching IP information...</p>
+    </div>
+
+    <div id="content" class="content" style="display: none;">
+      <div class="info-section">
+        <div class="info-item">
+          <span class="label">IP Address:</span>
+          <span class="value" id="ip">-</span>
+          <button class="copy-btn" data-field="ip" title="Copy">📋</button>
+        </div>
+      </div>
+
+      <div class="info-section">
+        <div class="info-item">
+          <span class="label">Country:</span>
+          <span class="value" id="country">-</span>
+        </div>
+        <div class="info-item">
+          <span class="label">Region/State:</span>
+          <span class="value" id="region">-</span>
+        </div>
+        <div class="info-item">
+          <span class="label">City:</span>
+          <span class="value" id="city">-</span>
+        </div>
+      </div>
+
+      <div class="info-section">
+        <div class="info-item">
+          <span class="label">Postal Code:</span>
+          <span class="value" id="postal_code">-</span>
+        </div>
+        <div class="info-item">
+          <span class="label">Timezone:</span>
+          <span class="value" id="timezone">-</span>
+        </div>
+      </div>
+
+      <div class="info-section">
+        <div class="info-item">
+          <span class="label">ISP:</span>
+          <span class="value" id="org">-</span>
+        </div>
+        <div class="info-item">
+          <span class="label">Latitude:</span>
+          <span class="value" id="latitude">-</span>
+        </div>
+        <div class="info-item">
+          <span class="label">Longitude:</span>
+          <span class="value" id="longitude">-</span>
+        </div>
+      </div>
+
+      <div id="error" class="error" style="display: none;"></div>
+    </div>
+
+    <div id="error-container" class="error-container" style="display: none;">
+      <p id="error-message"></p>
+      <button id="retryBtn" class="retry-btn">Retry</button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
