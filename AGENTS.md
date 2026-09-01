@@ -12,9 +12,15 @@ A minimal **Chrome Extension (Manifest V3)** that displays the user's public IP 
 - **JavaScript:** Vanilla ES6+ (no modules, no TypeScript, no bundler)
 - **CSS:** Plain CSS (no preprocessor, no framework)
 - **HTML:** Plain HTML5
-- **External APIs:**
-  - Primary: `https://ipapi.co/json/`
-  - Fallback: `https://ifconfig.co/json`
+- **External APIs (6 providers, tried in order until one succeeds):**
+  1. `https://ipapi.co/json/`
+  2. `https://ipwho.is/`
+  3. `https://free.freeipapi.com/api/json`
+  4. `https://ipinfo.io/json`
+  5. `https://ifconfig.co/json`
+  6. `https://api.country.is/` (IP + country only — last-resort fallback)
+
+  All six hosts **must** be listed in `host_permissions` in `manifest.json` or MV3 will block the request.
 
 ## File Structure
 
@@ -50,10 +56,18 @@ There is **no reactive framework**; DOM updates are done by directly mutating `t
 
 ### Key functions in `popup.js`
 - `fetchWithTimeout(url, timeout)` — wraps `fetch` with an `AbortController` (default 5000 ms timeout).
-- `fetchIPInfo()` — shows loading state, iterates `API_ENDPOINTS`, calls `displayIPInfo` on first success, otherwise calls `showError`.
-- `displayIPInfo(data)` — maps API response fields (`ip`, `country_name`, `region`, `postal`, `timezone`, `org`, `latitude`, `longitude`) into the DOM elements with matching IDs. Falls back between field names from the two APIs (e.g. `data.ip || data.IPv4`, `data.country_name || data.country`).
+- `fetchIPInfo()` — shows loading state, iterates `PROVIDERS`, calls `displayIPInfo` on first success, otherwise calls `showError`.
+- `displayIPInfo(fields, providerName)` — maps the already-normalized `fields` object into DOM elements and shows the provider label in the header.
 - `showError(message)` — displays the error section with a Retry button.
 - `copyToClipboard(text)` — uses `navigator.clipboard.writeText`, shows a transient "Copied!" notification appended to `document.body`.
+
+### Provider architecture
+`popup.js` defines a `PROVIDERS` array of objects, each with three fields:
+- `name` (string) — short identifier shown in the popup header (e.g. `"ipapi.co"`).
+- `url` (string) — HTTPS endpoint. Must be in `manifest.json` `host_permissions`.
+- `normalize(data)` (function) — takes the raw API JSON and returns a **unified field object** with the keys: `ip`, `country`, `region`, `city`, `postal_code`, `timezone`, `org`, `latitude`, `longitude`. May `throw` to mark the response as unusable (e.g. `ipwho.is` returns `{success: false, ...}`).
+
+`fetchIPInfo` validates that `fields.ip` is set before displaying; otherwise it treats the response as a failure and moves to the next provider. The loop logs each failure with the provider's name to the console.
 
 ### DOM ID contract
 The element IDs in `popup.html` (`ip`, `country`, `region`, `city`, `postal_code`, `timezone`, `org`, `latitude`, `longitude`) **must match the keys** in the `fields` object inside `displayIPInfo()`. If you add a new info field, add the span in `popup.html`, then add the matching key in the `fields` mapping.
@@ -67,7 +81,7 @@ The element IDs in `popup.html` (`ip`, `country`, `region`, `city`, `postal_code
 
 - `manifest_version: 3` — do **not** downgrade to MV2.
 - `permissions: ["activeTab"]` — minimal. There is no `storage`, `tabs`, `scripting`, etc.
-- `host_permissions: ["https://ipapi.co/*"]` — **only ipapi.co is whitelisted.** `ifconfig.co` is used as a runtime fallback but is NOT listed in `host_permissions`. This means the fallback will fail due to CORS/permission errors in strict MV3. If the fallback should actually work, add `https://ifconfig.co/*` to `host_permissions`. (This is a known gap — confirm with the user before changing manifest.)
+- `host_permissions` — **all 6 provider hosts must be listed.** Adding a new provider without updating `host_permissions` will cause the fetch to fail under MV3. The current list is `ipapi.co`, `ipwho.is`, `free.freeipapi.com`, `ipinfo.io`, `ifconfig.co`, `api.country.is` (all under `https://` and `/*`).
 - No background service worker, no content scripts, no options page.
 
 ## Permissions & Privacy
@@ -118,8 +132,8 @@ To iterate: edit files, then click the refresh icon on the extension card in `ch
 3. If the field should be copyable, add `<button class="copy-btn" data-field="<field>" title="Copy">📋</button>` next to it.
 
 ### Change or add an API endpoint
-- Edit `API_ENDPOINTS` in `popup.js`.
-- If the new host is not already in `manifest.json`'s `host_permissions`, add it there (required for MV3 `fetch` from a popup).
+- Add a provider object to `PROVIDERS` in `popup.js` with `name`, `url`, and `normalize(data)`. The `normalize` function must return an object with the unified field keys (`ip`, `country`, `region`, `city`, `postal_code`, `timezone`, `org`, `latitude`, `longitude`) and may `throw` to mark the response as unusable.
+- If the new host is not already in `manifest.json`'s `host_permissions`, add it there (required for MV3 `fetch` from a popup). Also confirm the API sends `Access-Control-Allow-Origin: *` (or echoes the request origin) — without CORS, the popup fetch will be blocked.
 
 ### Add a new UI section / state
 - Add the markup in `popup.html`, initially hidden via `style="display: none;"`.
@@ -127,7 +141,7 @@ To iterate: edit files, then click the refresh icon on the extension card in `ch
 
 ## Known Issues / Gotchas
 
-1. **Fallback API not whitelisted.** `ifconfig.co` is called at runtime but not listed in `host_permissions` — under strict MV3 enforcement this will be blocked. See Manifest Notes.
+1. **`ifconfig.co` CORS.** `ifconfig.co` does not send an `Access-Control-Allow-Origin` header. It is whitelisted in `host_permissions` and will work, but in some strict MV3 contexts the fetch may be blocked at the CORS preflight stage. The remaining 5 providers cover this case.
 2. **`navigator.clipboard` requires secure context.** Works on `chrome-extension://` but not on plain `http://` if you ever test by opening `popup.html` directly outside the extension.
 4. **No retry/backoff.** Failures immediately surface to the user; the only recovery is the manual Retry button.
 5. **Icon** — there is no extension icon configured (no `default_icon` in `action`, no `icons` at root). The popup works but Chrome will use a default placeholder.

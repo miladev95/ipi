@@ -1,7 +1,108 @@
-// API endpoints (using ipapi.co as primary, with fallback options)
-const API_ENDPOINTS = [
-  'https://ipapi.co/json/',
-  'https://ifconfig.co/json'
+const PROVIDERS = [
+  {
+    name: 'ipapi.co',
+    url: 'https://ipapi.co/json/',
+    normalize(data) {
+      return {
+        ip: data.ip || '-',
+        country: data.country_name || '-',
+        region: data.region || '-',
+        city: data.city || '-',
+        postal_code: data.postal || '-',
+        timezone: data.timezone || '-',
+        org: data.org || '-',
+        latitude: data.latitude || '-',
+        longitude: data.longitude || '-'
+      };
+    }
+  },
+  {
+    name: 'ipwho.is',
+    url: 'https://ipwho.is/',
+    normalize(data) {
+      if (data.success === false) throw new Error(data.message || 'Lookup failed');
+      return {
+        ip: data.ip || '-',
+        country: data.country || '-',
+        region: data.region || '-',
+        city: data.city || '-',
+        postal_code: data.postal || '-',
+        timezone: data.timezone?.id || '-',
+        org: data.connection?.org || data.connection?.isp || '-',
+        latitude: data.latitude ?? '-',
+        longitude: data.longitude ?? '-'
+      };
+    }
+  },
+  {
+    name: 'freeipapi.com',
+    url: 'https://free.freeipapi.com/api/json',
+    normalize(data) {
+      return {
+        ip: data.ipAddress || '-',
+        country: data.countryName || '-',
+        region: data.regionName || '-',
+        city: data.cityName || '-',
+        postal_code: data.zipCode || '-',
+        timezone: data.timeZones?.[0] || '-',
+        org: data.asnOrganization || '-',
+        latitude: data.latitude ?? '-',
+        longitude: data.longitude ?? '-'
+      };
+    }
+  },
+  {
+    name: 'ipinfo.io',
+    url: 'https://ipinfo.io/json',
+    normalize(data) {
+      const [lat, lon] = (data.loc || ',').split(',');
+      return {
+        ip: data.ip || '-',
+        country: data.country || '-',
+        region: data.region || '-',
+        city: data.city || '-',
+        postal_code: data.postal || '-',
+        timezone: data.timezone || '-',
+        org: data.org || '-',
+        latitude: lat || '-',
+        longitude: lon || '-'
+      };
+    }
+  },
+  {
+    name: 'ifconfig.co',
+    url: 'https://ifconfig.co/json',
+    normalize(data) {
+      return {
+        ip: data.ip || '-',
+        country: data.country || '-',
+        region: data.region_name || '-',
+        city: data.city || '-',
+        postal_code: data.zip_code || '-',
+        timezone: data.time_zone || '-',
+        org: data.asn_org || '-',
+        latitude: data.latitude ?? '-',
+        longitude: data.longitude ?? '-'
+      };
+    }
+  },
+  {
+    name: 'country.is',
+    url: 'https://api.country.is/',
+    normalize(data) {
+      return {
+        ip: data.ip || '-',
+        country: '-',
+        region: '-',
+        city: '-',
+        postal_code: '-',
+        timezone: '-',
+        org: '-',
+        latitude: '-',
+        longitude: '-'
+      };
+    }
+  }
 ];
 
 const TIMEOUT_MS = 5000;
@@ -36,54 +137,47 @@ async function fetchIPInfo() {
   const contentDiv = document.getElementById('content');
   const errorContainer = document.getElementById('error-container');
 
-  // Show loading, hide others
   loadingDiv.style.display = 'flex';
   contentDiv.style.display = 'none';
   errorContainer.style.display = 'none';
 
   let lastError = null;
 
-  // Try each endpoint
-  for (const endpoint of API_ENDPOINTS) {
+  for (const provider of PROVIDERS) {
     try {
-      const data = await fetchWithTimeout(endpoint);
-      displayIPInfo(data);
+      const data = await fetchWithTimeout(provider.url);
+      const fields = provider.normalize(data);
+      if (!fields.ip || fields.ip === '-') {
+        throw new Error('Missing IP in response');
+      }
+      displayIPInfo(fields, provider.name);
       return;
     } catch (error) {
       lastError = error;
-      console.warn(`Failed to fetch from ${endpoint}:`, error);
+      console.warn(`[${provider.name}] failed:`, error);
     }
   }
 
-  // If all endpoints fail
   showError(lastError?.message || 'Failed to fetch IP information');
 }
 
-function displayIPInfo(data) {
+function displayIPInfo(fields, providerName) {
   const loadingDiv = document.getElementById('loading');
   const contentDiv = document.getElementById('content');
   const errorContainer = document.getElementById('error-container');
+  const providerLabel = document.getElementById('provider-name');
 
-  // Map API response fields
-  const fields = {
-    ip: data.ip || data.IPv4 || '-',
-    country: data.country_name || data.country || '-',
-    region: data.region || data.region_name || '-',
-    city: data.city || '-',
-    postal_code: data.postal || data.postal_code || '-',
-    timezone: data.timezone || '-',
-    org: data.org || data.organization || '-',
-    latitude: data.latitude || data.lat || '-',
-    longitude: data.longitude || data.lon || '-'
-  };
-
-  // Update DOM elements
   Object.keys(fields).forEach(key => {
     const element = document.getElementById(key);
     if (element) {
       element.textContent = fields[key];
     }
   });
+
+  if (providerLabel) {
+    providerLabel.textContent = providerName;
+    providerLabel.classList.add('visible');
+  }
 
   loadingDiv.style.display = 'none';
   contentDiv.style.display = 'block';
@@ -104,7 +198,6 @@ function showError(message) {
 
 function copyToClipboard(text) {
   navigator.clipboard.writeText(text).then(() => {
-    // Show feedback
     const notification = document.createElement('div');
     notification.className = 'copy-notification';
     notification.textContent = 'Copied!';
@@ -118,11 +211,9 @@ function copyToClipboard(text) {
   });
 }
 
-// Event listeners
 document.getElementById('refreshBtn').addEventListener('click', fetchIPInfo);
 document.getElementById('retryBtn').addEventListener('click', fetchIPInfo);
 
-// Copy button listeners
 document.querySelectorAll('.copy-btn').forEach(btn => {
   btn.addEventListener('click', function() {
     const field = this.dataset.field;
@@ -133,5 +224,4 @@ document.querySelectorAll('.copy-btn').forEach(btn => {
   });
 });
 
-// Fetch IP info when popup opens
 fetchIPInfo();
